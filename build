@@ -21,7 +21,7 @@ INFO "Generating PB files (FIXME: skipped...)"
 
 ########## Go ##########
 INFO "Building nmz"
-go get -t github.com/osrg/namazu/nmz
+#go get -t github.com/osrg/namazu/nmz
 go build -o bin/nmz github.com/osrg/namazu/nmz
 
 INFO "Building nmz.static"
