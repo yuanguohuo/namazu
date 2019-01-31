@@ -27,6 +27,7 @@
 #include <linux/types.h>
 #include <linux/socket.h>
 #include <linux/netfilter.h>
+#include <libnfnetlink/libnfnetlink.h>
 #include <libnetfilter_queue/libnetfilter_queue.h>
 
 typedef struct {
@@ -65,6 +66,8 @@ static inline int Run(struct nfq_handle *h, int fd)
 {
     char buf[4096] __attribute__ ((aligned));
     int rv;
+
+    nfnl_rcvbufsiz(nfq_nfnlh(h), 64*1024*1024);
 
     int opt = 1;
     setsockopt(fd, SOL_NETLINK, NETLINK_NO_ENOBUFS, &opt, sizeof(int));
