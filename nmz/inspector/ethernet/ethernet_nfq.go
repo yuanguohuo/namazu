@@ -17,6 +17,7 @@ package ethernet
 
 import (
 	"fmt"
+	"sync"
 
 	netfilter "github.com/AkihiroSuda/go-netfilter-queue"
 	log "github.com/cihub/seelog"
@@ -30,7 +31,8 @@ import (
 type NFQInspector struct {
 	OrchestratorURL  string
 	EntityID         string
-	NFQNumber        uint16
+	NFQNumberStart   uint16
+	NFQNumberEnd     uint16
 	EnableTCPWatcher bool
 	trans            transceiver.Transceiver
 	tcpWatcher       *tcpwatcher.TCPWatcher
@@ -50,28 +52,52 @@ func (this *NFQInspector) Serve() error {
 	}
 	this.trans.Start()
 
-	nfq, err := netfilter.NewNFQueue(this.NFQNumber, 256, netfilter.NF_DEFAULT_PACKET_SIZE)
-	if err != nil {
-		return err
-	}
-	defer nfq.Close()
-	nfpChan := nfq.GetPackets()
-	for {
-		nfp := <-nfpChan
-		ip, tcp := this.decodeNFPacket(nfp)
-		// note: tcpwatcher is not thread-safe
-		if this.EnableTCPWatcher && this.tcpWatcher.IsTCPRetrans(ip, tcp) {
-			nfp.SetVerdict(netfilter.NF_DROP)
-			continue
+	numQ := int(this.NFQNumberEnd - this.NFQNumberStart + 1)
+	queues := make([]*netfilter.NFQueue, 0, numQ)
+
+	for i := this.NFQNumberStart; i <= this.NFQNumberEnd; i++ {
+		nfq, err := netfilter.NewNFQueue(i, 1024*1024, netfilter.NF_DEFAULT_PACKET_SIZE)
+		if err != nil {
+			fmt.Printf("error occurred when create NF queue. error:%s\n", err.Error())
+			return err
 		}
+		queues = append(queues, nfq)
+	}
+
+	defer func() {
+		for _, nfq := range queues {
+			nfq.Close()
+		}
+	}()
+
+	var wg sync.WaitGroup
+	for _, nfq := range queues {
+		nfpChan := nfq.GetPackets()
+		wg.Add(1)
 		go func() {
-			// can we use queue so as to improve determinism?
-			if err := this.onPacket(nfp, ip, tcp); err != nil {
-				log.Error(err)
+			defer wg.Done()
+			for {
+				nfp := <-nfpChan
+				ip, tcp := this.decodeNFPacket(nfp)
+				// note: tcpwatcher is not thread-safe
+				//       so, we enable it only if numQ == 1, in which case there is no concurrency;
+				if numQ == 1 && this.EnableTCPWatcher && this.tcpWatcher.IsTCPRetrans(ip, tcp) {
+					nfp.SetVerdict(netfilter.NF_DROP)
+					continue
+				}
+				go func() {
+					// can we use queue so as to improve determinism?
+					if err := this.onPacket(nfp, ip, tcp); err != nil {
+						log.Error(err)
+					}
+				}()
 			}
 		}()
 	}
+	wg.Wait()
+
 	// NOTREACHED
+	return nil
 }
 
 func (this *NFQInspector) decodeNFPacket(nfp netfilter.NFPacket) (ip *layers.IPv4, tcp *layers.TCP) {

@@ -19,6 +19,8 @@ package inspectors
 
 import (
 	"flag"
+	"strconv"
+	"strings"
 
 	log "github.com/cihub/seelog"
 	"github.com/mitchellh/cli"
@@ -30,6 +32,7 @@ type etherFlags struct {
 	commonFlags
 	HookSwitchZMQAddr string
 	NFQNumber         int
+	NFQBalance        string
 }
 
 var (
@@ -43,6 +46,8 @@ func init() {
 		"ipc:///tmp/namazu-hookswitch-zmq", "HookSwitch ZeroMQ addr")
 	etherFlagset.IntVar(&_etherFlags.NFQNumber, "nfq-number",
 		-1, "netfilter_queue number")
+	etherFlagset.StringVar(&_etherFlags.NFQBalance, "nfq-balance",
+		"", "netfilter_queue number range, in format start:end (both inclusive)")
 }
 
 type etherCmd struct {
@@ -66,15 +71,54 @@ func (cmd etherCmd) Run(args []string) int {
 		return 1
 	}
 
-	useHookSwitch := _etherFlags.NFQNumber < 0
+	useHookSwitch := _etherFlags.NFQNumber < 0 && _etherFlags.NFQBalance == ""
 
 	if useHookSwitch && _etherFlags.HookSwitchZMQAddr == "" {
 		log.Critical("hookswitch is invalid")
 		return 1
 	}
-	if !useHookSwitch && _etherFlags.NFQNumber > 0xFFFF {
-		log.Critical("nfq-number is invalid")
-		return 1
+
+	var start int = -1
+	var end int = -1
+
+	if !useHookSwitch {
+		if _etherFlags.NFQNumber >= 0 { // use NFQ Number
+			if _etherFlags.NFQNumber > 0xFFFF {
+				log.Critical("nfq-number is invalid")
+				return 1
+			}
+			start = _etherFlags.NFQNumber
+			end = _etherFlags.NFQNumber
+		} else { // use NFQ balance
+			pair := strings.Split(_etherFlags.NFQBalance, ":")
+
+			if len(pair) != 2 {
+				log.Criticalf("nfq-balance %s is invalid, it must be in 'start:end' format", _etherFlags.NFQBalance)
+				return 1
+			}
+
+			var err error
+			start, err = strconv.Atoi(pair[0])
+			if err != nil {
+				log.Criticalf("nfq-balance %s:%s is invalid, cannot parse %s to int. error:%s", pair[0], pair[1], pair[0], err.Error())
+				return 1
+			}
+			end, err = strconv.Atoi(pair[1])
+			if err != nil {
+				log.Criticalf("nfq-balance %s:%s is invalid, cannot parse %s to int. error:%s", pair[0], pair[1], pair[1], err.Error())
+				return 1
+			}
+
+			if start < 0 || start > 0xFFFF || end < 0 || end > 0xFFFF {
+				log.Criticalf("nfq-balance %s:%s is invalid, both of them should be in [0,65535]", pair[0], pair[1])
+				return 1
+			}
+
+			if start > end {
+				log.Criticalf("nfq-balance %s:%s is invalid, the former should be less than or equal to the latter", pair[0], pair[1])
+				return 1
+			}
+		}
 	}
 
 	autopilot, err := conditionalStartAutopilotOrchestrator(_etherFlags.commonFlags)
@@ -98,7 +142,8 @@ func (cmd etherCmd) Run(args []string) int {
 		etherInspector = &inspector.NFQInspector{
 			OrchestratorURL:  _etherFlags.OrchestratorURL,
 			EntityID:         _etherFlags.EntityID,
-			NFQNumber:        uint16(_etherFlags.NFQNumber),
+			NFQNumberStart:   uint16(start),
+			NFQNumberEnd:     uint16(end),
 			EnableTCPWatcher: true,
 		}
 	}

@@ -65,7 +65,12 @@ Ethernet inspector (ethernet)
     Implemented in Linux netfilter / Openflow.
     For Openflow implementation, you have to install hookswitch: https://github.com/osrg/hookswitch
 
-    Typical usage: nmz inspectors ethernet -nfq-number 42
+    Typical usage: 
+		    iptables -t filter -A OUTPUT -p tcp -m owner --uid-owner $(id -u $YourUser) -j NFQUEUE --queue-num 42
+		    nmz inspectors ethernet -nfq-number 42
+		or
+		    iptables -t filter -A OUTPUT -p tcp -m owner --uid-owner $(id -u $YourUser) -j NFQUEUE --queue-balance 0:127
+		    nmz inspectors ethernet -nfq-balance 0:127
 
     Event signals: PacketEvent
     Action signals: EventAcceptanceAction, PacketFaultAction
