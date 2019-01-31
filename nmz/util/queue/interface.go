@@ -30,6 +30,9 @@ type TimeBoundedQueueItem interface {
 	// enqueued time
 	EnqueuedTime() time.Time
 
+	// delay probability (>= 0.0 and <=1.0)
+	DelayActionProbability() float64
+
 	// min duration
 	MinDuration() time.Duration
 

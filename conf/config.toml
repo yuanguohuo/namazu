@@ -1,0 +1,35 @@
+# Policy for observing events and yielding actions
+# You can also implement your own policy.
+# Default: "random"
+explorePolicy = "random"
+
+[explorePolicyParam]
+  # for Ethernet/Filesystem/Java inspectors, event are non-deterministically delayed at a probability.
+  # delayActionProbability is the probability that events are delayed (0.0-1.0).
+  # Default: 1.0
+  # minInterval and maxInterval are bounds for the non-deterministic delays
+  # Default: 0 and 0
+  delayActionProbability = 0.1
+  minInterval = "1000ms"
+  maxInterval = "4000ms"
+
+  # for Ethernet/Filesystem inspectors, you can specify fault-injection probability (0.0-1.0).
+  # Default: 0.0
+  faultActionProbability = 0
+
+  # for Process inspector, you can specify how to schedule processes
+  # "mild": execute processes with randomly prioritized SCHED_NORMAL/SCHED_BATCH scheduler.
+  # "extreme": pick up some processes and execute them with SCHED_RR scheduler. others are executed with SCHED_BATCH scheduler.
+  # "dirichlet": execute processes with SCHED_DEADLINE scheduler. Dirichlet-distribution is used for deciding runtime values.
+  # Default: "mild"
+  procPolicy = "extreme"
+
+[container]
+  # Default: false
+  enableEthernetInspector = true
+  ethernetNFQNumber = 42
+  # Default: true
+  enableProcInspector = false
+  procWatchInterval = "1s"
+  # Default: true (for volumes (`-v /foo:/bar`))
+  enableFSInspector = true

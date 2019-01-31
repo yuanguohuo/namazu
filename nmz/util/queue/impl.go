@@ -28,20 +28,27 @@ import (
 type BasicTBQueueItem struct {
 	value        interface{}
 	enqueuedTime time.Time
-	minDuration  time.Duration
-	maxDuration  time.Duration
+
+	delayActionProbability float64
+	minDuration            time.Duration
+	maxDuration            time.Duration
 }
 
-func NewBasicTBQueueItem(value interface{}, minDuration, maxDuration time.Duration) (*BasicTBQueueItem, error) {
+func NewBasicTBQueueItem(value interface{}, delayActionProbability float64, minDuration, maxDuration time.Duration) (*BasicTBQueueItem, error) {
 	if minDuration > maxDuration {
 		return nil, fmt.Errorf("minDuration %s > maxDuration%s", minDuration, maxDuration)
+	}
+	if delayActionProbability < 0.0 || delayActionProbability > 1.0 {
+		return nil, fmt.Errorf("delayActionProbability %f is invalid, it must be in [0.0,1.0]", delayActionProbability)
 	}
 	rand.Seed(time.Now().UnixNano())
 	return &BasicTBQueueItem{
 		value:        value,
 		enqueuedTime: time.Unix(0, 0), // UNIX epoch (Jan 1, 1970 UTC)
-		minDuration:  minDuration,
-		maxDuration:  maxDuration,
+
+		delayActionProbability: delayActionProbability,
+		minDuration:            minDuration,
+		maxDuration:            maxDuration,
 	}, nil
 }
 
@@ -51,6 +58,10 @@ func (this *BasicTBQueueItem) Value() interface{} {
 
 func (this *BasicTBQueueItem) EnqueuedTime() time.Time {
 	return this.enqueuedTime
+}
+
+func (this *BasicTBQueueItem) DelayActionProbability() float64 {
+	return this.delayActionProbability
 }
 
 func (this *BasicTBQueueItem) MinDuration() time.Duration {
@@ -82,7 +93,9 @@ func NewBasicTBQueue() TimeBoundedQueue {
 				if item.MinDuration() != item.MaxDuration() {
 					panic(fmt.Errorf("minDuration != maxDuration: %#v", item))
 				}
-				<-time.After(item.MaxDuration())
+				if rand.Intn(1000) < int(item.DelayActionProbability()*1000.0) {
+					<-time.After(item.MaxDuration())
+				}
 				q.dequeueChan <- item.(TimeBoundedQueueItem)
 			}
 		}
@@ -120,7 +133,9 @@ func (this *BasicTBQueue) Enqueue(item_ TimeBoundedQueueItem) error {
 	} else {
 		go func() {
 			duration := determineDuration(item.minDuration, item.maxDuration)
-			<-time.After(duration)
+			if rand.Intn(1000) < int(item.DelayActionProbability()*1000.0) {
+				<-time.After(duration)
+			}
 			this.dequeueChan <- item
 		}()
 	}

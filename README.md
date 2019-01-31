@@ -81,6 +81,9 @@ The installation process is very simple:
 
     $ sudo apt-get install libzmq3-dev libnetfilter-queue-dev
     $ go get github.com/osrg/namazu/nmz
+    $ mkdir -p $GOPATH/src/github.com/osrg/
+    $ cd $GOPATH/src/github.com/osrg/
+    $ git clone https://github.com/yuanguohuo/namazu.git
 
 Currently, Namazu is tested with [Go 1.6](https://golang.org/dl/).
 

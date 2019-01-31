@@ -31,7 +31,7 @@ func TestTimeBoundedQueueWithoutDurations(t *testing.T) {
 	deqCh := queue.GetDequeueChan()
 	t.Logf("%s: Created queue: %#v", time.Now(), queue)
 	for i := 0; i < 3; i++ {
-		item, err := NewBasicTBQueueItem(42+i, time.Duration(0), time.Duration(0))
+		item, err := NewBasicTBQueueItem(42+i, 1.0, time.Duration(0), time.Duration(0))
 		assert.NoError(t, err)
 		t.Logf("%s: Enqueuing item: %#v", time.Now(), item)
 		err = queue.Enqueue(item)
@@ -52,7 +52,7 @@ func TestTimeBoundedQueueWithFixedDuration(t *testing.T) {
 	queue := NewBasicTBQueue()
 	deqCh := queue.GetDequeueChan()
 	for i := 0; i < 3; i++ {
-		item, err := NewBasicTBQueueItem(42+i, time.Duration(10*time.Millisecond), time.Duration(10*time.Millisecond))
+		item, err := NewBasicTBQueueItem(42+i, 1.0, time.Duration(10*time.Millisecond), time.Duration(10*time.Millisecond))
 		assert.NoError(t, err)
 		err = queue.Enqueue(item)
 		assert.NoError(t, err)
@@ -79,7 +79,7 @@ func TestTimeBoundedQueueWithSeveralDurationsConcurrent(t *testing.T) {
 		// https://github.com/golang/go/wiki/CommonMistakes
 		go func(k int, v []time.Duration) {
 			t.Logf("%s: Enqueue %d, %s", time.Now(), k, v)
-			item, err := NewBasicTBQueueItem(k, v[0], v[1])
+			item, err := NewBasicTBQueueItem(k, 1.0, v[0], v[1])
 			assert.NoError(t, err)
 			err = queue.Enqueue(item)
 			assert.NoError(t, err)

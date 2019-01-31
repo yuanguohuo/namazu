@@ -82,7 +82,7 @@ func (d *Dumb) ActionChan() chan signal.Action {
 }
 
 func (d *Dumb) QueueEvent(event signal.Event) {
-	item, err := queue.NewBasicTBQueueItem(event, d.Interval, d.Interval)
+	item, err := queue.NewBasicTBQueueItem(event, 1.0, d.Interval, d.Interval)
 	if err != nil {
 		panic(log.Critical(err))
 	}

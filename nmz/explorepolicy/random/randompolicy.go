@@ -38,6 +38,9 @@ type Random struct {
 	// shell action routine
 	shelActionRoutineRunning bool
 
+	// delay action probability
+	DelayActionProbability float64
+
 	// parameter "minInterval"
 	MinInterval time.Duration
 
@@ -98,6 +101,7 @@ func New() *Random {
 		queue:                    q,
 		queueDeqCh:               q.GetDequeueChan(),
 		shelActionRoutineRunning: false,
+		DelayActionProbability:   1.0,
 		MinInterval:              time.Duration(0),
 		MaxInterval:              time.Duration(0),
 		PrioritizedEntities:      make(map[string]bool, 0),
@@ -127,6 +131,8 @@ func (this *Random) Name() string {
 }
 
 // parameters:
+//  - delayActionProbability(float64): delay probability (0.0-1.0) of Ethernet/Filesystem/Java (default: 1.0)
+//
 //  - minInterval(duration): min interval in millisecs (default: 0 msecs)
 //
 //  - maxInterval(duration): max interval (default == minInterval)
@@ -160,6 +166,16 @@ func (r *Random) LoadConfig(cfg config.Config) error {
 	}
 
 	epp := "explorepolicyparam."
+
+	paramDelayActionProbability := epp + "delayActionProbability"
+	if cfg.IsSet(paramDelayActionProbability) {
+		r.DelayActionProbability = cfg.GetFloat64(paramDelayActionProbability)
+		log.Infof("Set delayActionProbability=%f", r.DelayActionProbability)
+	}
+	if r.DelayActionProbability < 0.0 || r.DelayActionProbability > 1.0 {
+		return fmt.Errorf("bad delayActionProbability %f", r.DelayActionProbability)
+	}
+
 	paramMinInterval := epp + "minInterval"
 	if cfg.IsSet(paramMinInterval) {
 		r.MinInterval = cfg.GetDuration(paramMinInterval)
@@ -338,7 +354,7 @@ func (r *Random) QueueEvent(event signal.Event) {
 		minInterval = time.Duration(float64(minInterval) * 0.8)
 		maxInterval = time.Duration(float64(maxInterval) * 0.8)
 	}
-	item, err := queue.NewBasicTBQueueItem(event, minInterval, maxInterval)
+	item, err := queue.NewBasicTBQueueItem(event, r.DelayActionProbability, minInterval, maxInterval)
 	if err != nil {
 		panic(log.Critical(err))
 	}
